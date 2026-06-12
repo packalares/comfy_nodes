@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# Auto-cloned DocRes upstream sources (downloaded on first node run).
+docres/DocRes/
+
+# Model checkpoints — never commit.
+*.pkl
+*.pth
+*.safetensors
+*.ckpt
+*.partial

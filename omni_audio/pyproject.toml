@@ -1,0 +1,23 @@
+[project]
+name = "comfyui-studio-omni-audio"
+description = "ComfyUI nodes for audio transcription and captioning via Qwen2.5-Omni and Qwen3-Omni model families. Forked from kana112233/ComfyUI-kaola-ace-step."
+version = "0.1.0"
+license = { text = "MIT" }
+dependencies = [
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+    "numpy>=1.24.0",
+    "soundfile>=0.12.0",
+    "librosa>=0.10.0",
+    "transformers>=4.51.0,<5.0.0",
+    "qwen-omni-utils>=0.0.9",
+]
+
+[tool.comfy]
+PublisherId = "packalares"
+DisplayName = "Omni Audio (Studio)"
+Icon = ""
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"

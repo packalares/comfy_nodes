@@ -1,0 +1,11 @@
+torch>=2.0.0
+torchaudio>=2.0.0
+numpy>=1.24.0
+soundfile>=0.12.0
+librosa>=0.10.0
+transformers>=4.51.0,<5.0.0
+qwen-omni-utils>=0.0.9
+# Optional: AWQ kernels for Qwen3-Omni 4-bit checkpoints. Not strictly required
+# for the Qwen2.5-Omni-only path. Uncomment if you plan to use the jart25 or
+# cpatonn AWQ-W4A16 quantizations of Qwen3-Omni.
+# autoawq>=0.2.5
