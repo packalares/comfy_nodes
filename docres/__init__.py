@@ -54,6 +54,49 @@ class _ChdirTo:
         os.chdir(self._prev)
 
 
+class _DocResNamespace:
+    """Temporarily expose DocRes's top-level modules (`utils`, `models`,
+    `data`) at their canonical bare names in `sys.modules`. ComfyUI ships its
+    own `utils` package, so without this DocRes's `from utils import
+    convert_state_dict` resolves to ComfyUI's `utils/__init__.py` and fails.
+    On exit, DocRes's modules are stashed under `_docres_*` keys and ComfyUI's
+    modules are restored. Use it around both the inference-module import
+    AND every inference call — DocRes's helper modules may dynamically import
+    each other at call time."""
+
+    _NAMES = ('utils', 'models', 'data')
+    _PREFIX = '_docres_'
+
+    def __enter__(self):
+        self._saved = {}
+        for name in list(sys.modules):
+            for p in self._NAMES:
+                if name == p or name.startswith(p + '.'):
+                    self._saved[name] = sys.modules.pop(name)
+                    break
+        # Re-promote previously-stashed DocRes modules to canonical names.
+        for name in list(sys.modules):
+            if not name.startswith(self._PREFIX):
+                continue
+            canonical = name[len(self._PREFIX):]
+            for p in self._NAMES:
+                if canonical == p or canonical.startswith(p + '.'):
+                    sys.modules[canonical] = sys.modules[name]
+                    break
+        return self
+
+    def __exit__(self, *exc):
+        # Stash DocRes's modules back under private keys.
+        for name in list(sys.modules):
+            for p in self._NAMES:
+                if name == p or name.startswith(p + '.'):
+                    sys.modules[self._PREFIX + name] = sys.modules.pop(name)
+                    break
+        # Restore ComfyUI's modules to canonical names.
+        for name, mod in self._saved.items():
+            sys.modules[name] = mod
+
+
 def _log(msg):
     print(f'[ComfyUI-DocRes] {msg}', flush=True)
 
@@ -117,7 +160,7 @@ def _load_inference_module():
     _ensure_repo()
     if _DOCRES_DIR not in sys.path:
         sys.path.insert(0, _DOCRES_DIR)
-    with _ChdirTo(_DOCRES_DIR):
+    with _ChdirTo(_DOCRES_DIR), _DocResNamespace():
         try:
             import inference as inf  # noqa: WPS433
         except ImportError as e:
@@ -142,17 +185,17 @@ def _get_model(device):
     # own __main__. We replicate that.
     inf.DEVICE = device
 
-    with _ChdirTo(_DOCRES_DIR):
-        from models import restormer_arch
-        from utils import convert_state_dict
-        model = restormer_arch.Restormer(
+    with _ChdirTo(_DOCRES_DIR), _DocResNamespace():
+        # Use the already-bound references inside the inference module so we
+        # don't re-trigger `from utils import …` / `from models import …`.
+        model = inf.restormer_arch.Restormer(
             inp_channels=6, out_channels=3, dim=48,
             num_blocks=[2, 3, 3, 4], num_refinement_blocks=4,
             heads=[1, 2, 4, 8], ffn_expansion_factor=2.66,
             bias=False, LayerNorm_type='WithBias', dual_pixel_task=True,
         )
         map_loc = 'cpu' if device.type == 'cpu' else 'cuda:0'
-        state = convert_state_dict(torch.load(ckpt, map_location=map_loc)['model_state'])
+        state = inf.convert_state_dict(torch.load(ckpt, map_location=map_loc)['model_state'])
         model.load_state_dict(state)
         model.eval().to(device)
 
@@ -182,7 +225,7 @@ def _run_one(model, inf, device, bgr, task):
     os.close(fd)
     try:
         cv2.imwrite(tmp_path, bgr)
-        with _ChdirTo(_DOCRES_DIR):
+        with _ChdirTo(_DOCRES_DIR), _DocResNamespace():
             if task == 'end2end':
                 os.makedirs('restorted', exist_ok=True)
             inf.DEVICE = device
